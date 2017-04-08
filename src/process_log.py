@@ -16,6 +16,8 @@ reply = "reply"
 bytes = "bytes"
 
 # Regular expression to group the components of each line
+# Regular expression to distinguish and parse the components of each line
+# host, timestamp, request, response, and bytes
 # line_regex = r"^([^\s]+) - - (\[[^\]]+\]) (\"[^\"]+\") ([^\s]+) ([^\s]+)$"
 line_regex = r"^([^\s]+) - - \[([^\]]+)\] \"(.+)\" ([^\s]+) ([^\s]+)$"
 regex = re.compile(line_regex)
@@ -23,31 +25,57 @@ regex = re.compile(line_regex)
 
 counter = 0
 blocked_count = 0
+
+# Regular Expression to identify the type of message, and the parse the request
+# component of the log entry accordingly
 request_regex_start = re.compile(r"^(GET|POST|HEAD)\s+")
 request_regex_tail = re.compile(r"\s+(HTTP\/1.0)$")
+# Dictionary to store the sum of all bytes transferred for each resource
 resource_bytes_transferred = collections.defaultdict(int)
+
+# List to store each line in the input file as a log entry broken down into a dictionary
+# The dictionary is defined using 5 keys:
+# host, timestamp, request, response, and bytes
 log_list = list()
+
+# Dictionary to store the number of times a user/IP request hits the server
 host_dict = collections.defaultdict(int)
+
+# Dictionary to store the counter which monitors the number of failed login attempts by each IP address
 failed_login = collections.defaultdict(list)
 
-fdict = collections.defaultdict(list)
+# Dictionary to store the blocked the IP addresses which are added here after 3 consecutive failed login attempts
+# It stores the IP with the start time of the block period
 blocked_hosts = dict()
 
+# Dictionary to store the maximum number of requests over a 60 minute period.
+# The dictionary stores the number of requests received and the start time.
+max_all = collections.defaultdict(list)
 
+
+# Breaks a line parsed from the input file into the various fields:
+# host, timestamp, request, response, and bytes
+# Input: A line from log.txt input file
+# Output: A dictionary with the 5 keys mentioned along with their values
 def break_line(line):
     _data = {}
     _data[host], _data[timestamp], _data[request], _data[reply], _data[bytes] = regex.search(line).groups()
     return _data
 
 
+# Returns the time at the given input timestamp provided in the log_entry
+# Converts the text timestamp into a datetime structure
 def time_at(index):
     return datetime.strptime(log_list[index][timestamp],"%d/%b/%Y:%H:%M:%S -0400")
 
 
+# Returns the time difference between 2 log entries based on their timestamps.
+# The log entries are identified by their respective indexes/order in the input file
 def time_difference(index1, index2):
     return round(float((time_at(index1) - time_at(index2)).total_seconds()/60.0),2)
 
 
+# Retrieves the data in the input file as per argv[1]
 def get_input_file(input_file):
     input_file_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', input_file))
     with open(input_file_path, "r") as f:
@@ -57,12 +85,18 @@ def get_input_file(input_file):
         log_list.append(break_line(line))
 
 
+# Retrieves the top 10 items from a dictionary based on the value parameter.
+# Input: Any dictionary with a numerical value
 def get_top_ten_items(data_dictionary):
     inverted_value_heap_list = [(-value, key) for key, value in data_dictionary.items()]
     heap_list = heapq.nsmallest(10, inverted_value_heap_list)
     return [(key, -value) for value, key in heap_list]
 
 
+
+# Returns True/False if a login attempt was successful or failed according to the log entry
+# 401 -> True(Failed)
+# 200 -> False(Successful)
 def login_failed(response):
     if response == "401":
         return True
@@ -70,6 +104,7 @@ def login_failed(response):
         return False
 
 
+# Formats the output text to write blocked log entries to file for feature 4
 def format_blocked_output(log_entry):
     entry = log_entry[host]
     entry = entry + " - - "
@@ -80,10 +115,12 @@ def format_blocked_output(log_entry):
     return entry
 
 
+# Returns the time difference between two datetime structures in seconds
 def time_difference_in_seconds(time1, time2):
         return (time1 - time2).total_seconds()
 
 
+# Implements Feature 1
 def feature_1(feature1_output_file):
     for index, log_entry in enumerate(log_list):
         host_dict[log_entry[host]] += 1
@@ -92,6 +129,7 @@ def feature_1(feature1_output_file):
             f.write(str(key) + "," +str(value) +"\n")
 
 
+# Implements Feature 2
 def feature_2(feature2_output_file):
     for index, log_entry in enumerate(log_list):
         if log_entry[bytes] == '-':
@@ -115,7 +153,7 @@ def feature_2(feature2_output_file):
             f.write(key +"\n")
 
 
-
+# Implements Feature 3
 def feature_3(feature3_output_file):
 
     file_write_count = 0
@@ -163,6 +201,7 @@ def feature_3(feature3_output_file):
     pass
 
 
+# Implements Feature 4
 def feature_4(feature4_output_file):
     with open(feature4_output_file, "w") as f:
         blocked_count = 0
@@ -204,7 +243,6 @@ def main(argv):
     time_start = time.time()
 
     print  argv
-    # if len(argv) == 5:
     input_file = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', argv[1]))
     feature1_output_file = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', argv[2]))
     feature2_output_file = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', argv[3]))
