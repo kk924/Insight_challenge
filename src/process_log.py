@@ -80,7 +80,7 @@ def get_input_file(input_file):
     input_file_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', input_file))
     with open(input_file_path, "r") as f:
         data = f.readlines()
-    print len(data)
+    # print len(data)
     for index, line in enumerate(data):
         log_list.append(break_line(line))
 
@@ -180,20 +180,21 @@ def feature_3(feature3_output_file):
         pointer = 0
 
         # Increment pointer to the first log_entry based on the current start_time
-        while time_at(pointer) < start_time and pointer < len(log_list):
-            pointer += 1
+        while time_at(start) < start_time and start < len(log_list):
+            start += 1
 
-        start = pointer
+        # start = pointer
 
         # Increment pointer till it covers all possible log entries within the 60 minute window
-        while time_at(pointer) < start_time + dt.timedelta(0,3600) and pointer < len(log_list)-1:
-            pointer += 1
+        while time_at(end) < start_time + dt.timedelta(0,3600) and end < len(log_list)-1:
+            end += 1
 
-        end = pointer
+        # end = pointer
 
         # Format and store the number of events
         start_time_text = start_time.strftime("%d/%b/%Y:%H:%M:%S") + " -0400"
         hourly_request_counter[end-start+1].append(start_time_text)
+        # print hourly_request_counter
 
         if len(hourly_request_counter.keys()) > 10:
             hourly_request_counter.pop(min(sorted(hourly_request_counter.keys())), None)
