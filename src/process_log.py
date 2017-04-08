@@ -122,8 +122,12 @@ def time_difference_in_seconds(time1, time2):
 
 # Implements Feature 1
 def feature_1(feature1_output_file):
+
+    # For each log entry in the input file, sum up the occurance of each IP/host
     for index, log_entry in enumerate(log_list):
         host_dict[log_entry[host]] += 1
+
+    # Based on the calculated sums, retrieve the top 10 most active IP/hosts
     with open(feature1_output_file, "w") as f:
         for key, value in get_top_ten_items(host_dict):
             f.write(str(key) + "," +str(value) +"\n")
@@ -136,6 +140,9 @@ def feature_2(feature2_output_file):
             log_bytes = 0
         else:
             log_bytes = int(log_entry[bytes])
+
+        # Get resource name according to the contents of the request in the log entry
+        # Example, some log entries do not have GET/POST headers
         if request_regex_start.search(log_entry[request]) is not None:
             if request_regex_tail.search(log_entry[request]) is not None:
                 resource_key = "".join(log_entry[request].split()[1:len(log_entry[request].split())-1])
@@ -146,6 +153,8 @@ def feature_2(feature2_output_file):
                 resource_key = "".join(log_entry[request].split()[0:len(log_entry[request].split())-1])
             else:
                 resource_key = "".join(log_entry[request].split()[0:len(log_entry[request].split())])
+
+        # Add the bytes for the resource
         resource_bytes_transferred[resource_key] += log_bytes
 
     with open(feature2_output_file, "w") as f:
@@ -156,29 +165,33 @@ def feature_2(feature2_output_file):
 # Implements Feature 3
 def feature_3(feature3_output_file):
 
+    # Counter to write up to 10 items into the output file
     file_write_count = 0
 
-    max_all = collections.defaultdict(list)
     hourly_request_counter = collections.defaultdict(list)
     start = 0
     start_time = time_at(start)
     end_time = time_at(len(log_list)-1)
     end = 1
-    counter = 0
 
+    # Start with the time mentioned in the first log entry timestamp
+    # Find all log entries in the hour starting from start_time
     while start_time < end_time:
         pointer = 0
 
+        # Increment pointer to the first log_entry based on the current start_time
         while time_at(pointer) < start_time and pointer < len(log_list):
             pointer += 1
 
         start = pointer
 
+        # Increment pointer till it covers all possible log entries within the 60 minute window
         while time_at(pointer) < start_time + dt.timedelta(0,3600) and pointer < len(log_list)-1:
             pointer += 1
 
         end = pointer
 
+        # Format and store the number of events
         start_time_text = start_time.strftime("%d/%b/%Y:%H:%M:%S") + " -0400"
         hourly_request_counter[end-start+1].append(start_time_text)
 
@@ -187,6 +200,7 @@ def feature_3(feature3_output_file):
 
         start_time = start_time + dt.timedelta(0, 1)
 
+    # Write to file
     with open(feature3_output_file, "w") as f:
         for k,v in sorted(hourly_request_counter.items(), key=lambda x: x[0], reverse=True)[:10]:
             for value in v:
@@ -204,18 +218,22 @@ def feature_3(feature3_output_file):
 # Implements Feature 4
 def feature_4(feature4_output_file):
     with open(feature4_output_file, "w") as f:
-        blocked_count = 0
         for index, log_entry in enumerate(log_list):
+
+            # For each log entry, check first if it is blocked and in the blocked period of 5 minutes
+            # If it is in the blocked list, but current timestamp is beyond the blocked window,
+            # delete the IP from the list of blocked IPs
             if log_entry[host] in blocked_hosts:
                 if time_difference_in_seconds(time_at(index), blocked_hosts[log_entry[host]]) <= 300:
                     # Add to blocked list
                     # print "Blocked :", log_entry
                     f.write(format_blocked_output(log_entry) +"\n")
-                    blocked_count += 1
                     continue
                 else:
                     blocked_hosts.pop(log_entry[host], None)
 
+            # Evalute the log entry to determine if it is a failed login
+            # If it is a failed login, then how many times has it failed within the 20 second window
             if "POST" in log_entry[request] and "login" in log_entry[request]:
                 if login_failed(log_entry[reply]):
                     if log_entry[host] not in failed_login or len(failed_login[log_entry[host]]) == 0:
@@ -226,6 +244,10 @@ def feature_4(feature4_output_file):
                             del failed_login[log_entry[host]]
                             failed_login[log_entry[host]].append(time_at(index))
                         else:
+                            # If length was 2, this is the third failed attempt.
+                            # Clear the IP from the failed_login counter data structure
+                            # And add the IP to the Blocked IP list along with the current timestamp
+                            # Which indicates the start of the 5 minute block period
                             if len(failed_login[log_entry[host]]) == 2:
                                 blocked_hosts[log_entry[host]] = time_at(index)
                                 del failed_login[log_entry[host]]
@@ -236,7 +258,6 @@ def feature_4(feature4_output_file):
                     # Login succeeded
                     if log_entry[host] in failed_login or len(failed_login[log_entry[host]]) > 0:
                         failed_login.pop(log_entry[host], None)
-        print blocked_count
 
 
 def main(argv):
@@ -255,19 +276,19 @@ def main(argv):
 
     t = time.time()
     feature_1(feature1_output_file)
-    print "F1: ", time.time() - t
+    print "Feature1: ", time.time() - t
 
     t = time.time()
     feature_2(feature2_output_file)
-    print "F2: ", time.time() - t
+    print "Feature2: ", time.time() - t
 
     t = time.time()
     feature_3(feature3_output_file)
-    print "F3: ", time.time() - t
+    print "Feature3: ", time.time() - t
 
     t = time.time()
     feature_4(feature4_output_file)
-    print "F4: ", time.time() - t
+    print "Feature4: ", time.time() - t
 
     print "Total time: ", time.time() - time_start
 
