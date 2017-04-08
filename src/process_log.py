@@ -5,6 +5,7 @@ import re
 import time
 import heapq
 from datetime import datetime
+import datetime as dt
 
 # input_file = "log_input/log.txt"
 
@@ -114,52 +115,52 @@ def feature_2(feature2_output_file):
             f.write(key +"\n")
 
 
+
 def feature_3(feature3_output_file):
+
+    file_write_count = 0
+
     max_all = collections.defaultdict(list)
+    hourly_request_counter = collections.defaultdict(list)
     start = 0
+    start_time = time_at(start)
+    end_time = time_at(len(log_list)-1)
     end = 1
     counter = 0
-    if len(log_list) <= 1:
-        print len(log_list)
-    else:
 
-        while end < len(log_list):
-            if end % 10000 == 0:
-                counter += 1
-                print "...", counter
+    while start_time < end_time:
+        pointer = 0
 
-            if time_difference(end, start) <= 60.0:
-                pass
-            if time_difference(end, start) > 60.0 or end == len(log_list) - 1:
-                if len(max_all.keys()) < 10:
-                    min_threshold = 1
-                else:
-                    min_threshold = sorted(max_all.keys())[0]
-                if time_difference(end - 1, start) <= 60.0 or start == end - 1:
-                    if end == len(log_list) - 1:
-                        max_all[end - start + 1].append(log_list[start][timestamp])
-                    elif end - start >= min_threshold:
-                        max_all[end - start].append(log_list[start][timestamp])
-                    if len(max_all.keys()) > 10:
-                        # max_all.pop(min_threshold, None)
-                        pass
-                while start <= end and time_difference(end, start) > 60.0:
-                    start += 1
+        while time_at(pointer) < start_time and pointer < len(log_list):
+            pointer += 1
 
-            end += 1
-    file_write_count = 0
+        start = pointer
+
+        while time_at(pointer) < start_time + dt.timedelta(0,3600) and pointer < len(log_list)-1:
+            pointer += 1
+
+        end = pointer
+
+        start_time_text = start_time.strftime("%d/%b/%Y:%H:%M:%S") + " -0400"
+        hourly_request_counter[end-start+1].append(start_time_text)
+
+        if len(hourly_request_counter.keys()) > 10:
+            hourly_request_counter.pop(min(sorted(hourly_request_counter.keys())), None)
+
+        start_time = start_time + dt.timedelta(0, 1)
+
     with open(feature3_output_file, "w") as f:
-        print max_all
-        for k,v in sorted(max_all.items(), key=lambda x: x[0], reverse=True)[:10]:
+        for k,v in sorted(hourly_request_counter.items(), key=lambda x: x[0], reverse=True)[:10]:
             for value in v:
-                print "writing this", str(value) + "," + str(k) +"\n"
+                # print "writing this", str(value) + "," + str(k) +"\n"
                 f.write(str(value) + "," + str(k) +"\n")
                 file_write_count += 1
                 if file_write_count == 10:
                     break
             if file_write_count == 10:
                 break
-        f.write("\n")
+
+    pass
 
 
 def feature_4(feature4_output_file):
